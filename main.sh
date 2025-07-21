@@ -29,12 +29,12 @@ get_status_inline() {
 
   if [[ "$os" == "ubuntu" || "$os" == "debian" ]]; then
     if [[ -f /etc/apt/sources.list ]]; then
-      current_mirror=$(grep -m1 '^deb ' /etc/apt/sources.list | awk '{print $2}')
+      current_mirror=$(grep -m1 '^deb ' /etc/apt/sources.list | awk '{print $2}' | awk -F/ '{print $3}')
     elif [[ -f /etc/apt/sources.list.d/ubuntu.sources ]]; then
-      current_mirror=$(grep -m1 -o 'http[s]\?://[^ ]*' /etc/apt/sources.list.d/ubuntu.sources)
+      current_mirror=$(grep -m1 -o 'http[s]\?://[^ ]*' /etc/apt/sources.list.d/ubuntu.sources | awk -F/ '{print $3}')
     fi
   elif [[ "$os" == "almalinux" || "$os" == "centos" || "$os" == "rhel" ]]; then
-    current_mirror=$(dnf repolist -v 2>/dev/null | grep '^Repo-baseurl' | awk '{print $2}' | head -n1)
+    current_mirror=$(dnf repolist -v 2>/dev/null | grep '^Repo-baseurl' | awk '{print $2}' | sed -E 's|http[s]?://([^/]+)/.*|\1|' | head -n1)
   else
     current_mirror="Unknown"
   fi
@@ -49,6 +49,7 @@ restore_defaults() {
     sudo cp "$CONFIG_DIR/default_sources.list" /etc/apt/sources.list
     sudo apt-get update
   elif [[ "$os" == "almalinux" || "$os" == "centos" || "$os" == "rhel" ]]; then
+    sudo rm -f /etc/yum.repos.d/*.repo
     sudo cp "$CONFIG_DIR/default.repo.bak" /etc/yum.repos.d/default.repo
     sudo dnf clean all
     sudo dnf makecache
@@ -105,35 +106,63 @@ select_mirror() {
   echo -e "${BLUE}Testing Mirrors...${NC}"
   os=$(get_os)
 
-  if [[ "$os" != "ubuntu" && "$os" != "debian" ]]; then
-    echo -e "${RED}Mirror selection only supported on Ubuntu/Debian.${NC}"
-    read -p "Press Enter to return..."
-    return
-  fi
+  if [[ "$os" == "ubuntu" || "$os" == "debian" ]]; then
+    mirrors=( $(cat "$CONFIG_DIR/ubuntu_sources.mirror" 2>/dev/null) )
+    best_mirror=""
+    best_speed=0
 
-  mirrors=( $(cat "$CONFIG_DIR/ubuntu_sources.mirror" 2>/dev/null) )
-  best_mirror=""
-  best_speed=0
-
-  for mirror in "${mirrors[@]}"; do
-    speed=$(measure_speed "$mirror")
-    if [[ "$speed" == -1 ]]; then
-      echo -e "$mirror | ${RED}Failed${NC}"
-    else
-      echo -e "$mirror | ${GREEN}${speed} KB/s${NC}"
-      if (( $(echo "$speed > $best_speed" | bc -l) )); then
-        best_speed=$speed
-        best_mirror=$mirror
+    for mirror in "${mirrors[@]}"; do
+      speed=$(measure_speed "$mirror")
+      if [[ "$speed" == -1 ]]; then
+        echo -e "$mirror | ${RED}Failed${NC}"
+      else
+        echo -e "$mirror | ${GREEN}${speed} KB/s${NC}"
+        if (( $(echo "$speed > $best_speed" | bc -l) )); then
+          best_speed=$speed
+          best_mirror=$mirror
+        fi
       fi
-    fi
-  done
+    done
 
-  if [ -n "$best_mirror" ]; then
-    echo -e "Using fastest mirror: $best_mirror"
-    sudo sed -i "s|http[s]\?://[^ ]*ubuntu[^ ]*|$best_mirror|g" /etc/apt/sources.list
-    sudo apt-get update
+    if [ -n "$best_mirror" ]; then
+      echo -e "Using fastest mirror: $best_mirror"
+      sudo sed -i "s|http[s]\?://[^ ]*ubuntu[^ ]*|$best_mirror|g" /etc/apt/sources.list
+      sudo apt-get update
+    else
+      echo -e "${RED}No suitable mirror found.${NC}"
+    fi
+  elif [[ "$os" == "almalinux" || "$os" == "centos" || "$os" == "rhel" ]]; then
+    echo -e "${BLUE}Setting mirrorlist for AlmaLinux/CentOS...${NC}"
+
+    if [[ -f /etc/yum.repos.d/MariaDB1011.repo ]]; then
+      sudo sed -i 's/enabled=1/enabled=0/' /etc/yum.repos.d/MariaDB1011.repo
+    fi
+
+    arch=$(uname -m)
+    releasever=$(rpm -q --qf "%{VERSION}" $(rpm -q --whatprovides redhat-release))
+
+    sudo tee /etc/yum.repos.d/almalinux-base.repo > /dev/null <<EOF
+[baseos]
+name=AlmaLinux-\$releasever - BaseOS
+mirrorlist=https://mirrors.almalinux.org/mirrorlist?repo=BaseOS&arch=$arch
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-AlmaLinux
+
+[appstream]
+name=AlmaLinux-\$releasever - AppStream
+mirrorlist=https://mirrors.almalinux.org/mirrorlist?repo=AppStream&arch=$arch
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-AlmaLinux
+EOF
+
+    sudo dnf clean all
+    sudo dnf makecache
+
+    echo -e "${GREEN}✅ Mirrorlist updated for AlmaLinux/CentOS.${NC}"
   else
-    echo -e "${RED}No suitable mirror found.${NC}"
+    echo -e "${RED}Mirror selection not supported on this OS.${NC}"
   fi
   read -p "Press Enter to return..."
 }
