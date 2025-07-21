@@ -1,41 +1,35 @@
 #!/bin/bash
 
+# Linux Network Fixer Installer
+
+INSTALL_DIR="/opt/linux-network-fixer"
+BIN_PATH="/usr/local/bin/linux-net"
+CONFIG_DIR="/etc/linux-network-fixer"
+
 set -e
 
-REPO_URL="https://github.com/dev-ir/Linux-Network-Fixer"
-INSTALL_DIR="/opt/linux-network-fixer"
-BIN_NAME="linux-net"
-BIN_PATH="/usr/local/bin/$BIN_NAME"
-CONFIG_PATH="/etc/linux-network-fixer"
+echo -e "\033[1;36m🔧 Installing Linux Network Fixer from GitHub...\033[0m"
 
-echo "🔧 Installing Linux Network Fixer from GitHub..."
-
-# Clone or update repo
-if [ -d "$INSTALL_DIR/.git" ]; then
-  echo "🔄 Updating existing repo at $INSTALL_DIR..."
-  git -C "$INSTALL_DIR" pull --quiet
-else
-  echo "📥 Cloning repo to $INSTALL_DIR..."
-  sudo git clone --depth 1 "$REPO_URL" "$INSTALL_DIR"
+# Remove old version if exists
+if [ -d "$INSTALL_DIR" ]; then
+  echo -e "\033[1;33m⚠️  Old installation detected. Removing...\033[0m"
+  sudo rm -rf "$INSTALL_DIR"
+fi
+if [ -f "$BIN_PATH" ]; then
+  sudo rm -f "$BIN_PATH"
+fi
+if [ -d "$CONFIG_DIR" ]; then
+  sudo rm -rf "$CONFIG_DIR"
 fi
 
-# Make main script executable
-sudo chmod +x "$INSTALL_DIR/main.sh"
+# Clone fresh
+sudo git clone --depth=1 https://github.com/dev-ir/Linux-Network-Fixer.git "$INSTALL_DIR"
 
-# Create symlink
-echo "🔗 Creating symlink: $BIN_PATH"
-sudo ln -sf "$INSTALL_DIR/main.sh" "$BIN_PATH"
+# Install binary
+sudo install -m 755 "$INSTALL_DIR/main.sh" "$BIN_PATH"
 
-# Create config directory if needed
-echo "📁 Copying config files to $CONFIG_PATH"
-sudo mkdir -p "$CONFIG_PATH"
-for file in dns_list.dns ubuntu_sources.mirror test_domains.list; do
-  if [ -f "$INSTALL_DIR/$file" ]; then
-    sudo cp -n "$INSTALL_DIR/$file" "$CONFIG_PATH/"
-  fi
-done
+# Copy config
+sudo mkdir -p "$CONFIG_DIR"
+sudo cp -r "$INSTALL_DIR/configs/"* "$CONFIG_DIR/"
 
-echo ""
-echo "✅ Done."
-echo "You can now run the tool using:"
-echo -e "   \033[0;32mlinux-net\033[0m"
+echo -e "\033[1;32m✅ Installation complete. Run using: linux-net\033[0m"
