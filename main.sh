@@ -16,6 +16,20 @@ NC='\033[0m' # No Color
 # Config directory
 CONFIG_DIR="/etc/linux-network-fixer"
 
+# Ensure bc is installed
+if ! command -v bc >/dev/null 2>&1; then
+  echo -e "${BLUE}Installing required package: bc${NC}"
+  os_id=$(grep -E '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
+  if [[ "$os_id" == "ubuntu" || "$os_id" == "debian" ]]; then
+    sudo apt-get update && sudo apt-get install -y bc
+  elif [[ "$os_id" == "almalinux" || "$os_id" == "centos" || "$os_id" == "rhel" ]]; then
+    sudo dnf install -y bc
+  else
+    echo -e "${RED}bc not found and automatic install not supported for this OS.${NC}"
+    exit 1
+  fi
+fi
+
 # Read DNS list from config
 dns_list=()
 while IFS= read -r line; do
@@ -57,7 +71,7 @@ get_status_inline() {
   if [[ "$os" == "ubuntu" || "$os" == "debian" ]]; then
     current_mirror=$(grep -m1 -o 'http[s]\?://[^ ]*' /etc/apt/sources.list 2>/dev/null)
   elif [[ "$os" == "almalinux" || "$os" == "centos" || "$os" == "rhel" ]]; then
-    current_mirror=$(grep -m1 -o 'http[s]\?://[^ ]*' /etc/yum.repos.d/*.repo 2>/dev/null)
+    current_mirror=$(grep -hEo '^baseurl=https?://[^ $]+' /etc/yum.repos.d/*.repo | cut -d= -f2 | head -n1)
   else
     current_mirror="N/A"
   fi
