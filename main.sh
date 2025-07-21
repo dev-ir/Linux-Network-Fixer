@@ -1,7 +1,7 @@
 #!/bin/bash
 
+# Linux Network Fixer
 # File: /usr/local/bin/linux-net
-# Make sure to chmod +x this file and link it for global use
 
 clear
 
@@ -13,19 +13,29 @@ CYAN='\033[0;36m'
 WHITE='\033[0;37m'
 NC='\033[0m' # No Color
 
-# Read DNS list from .dns file
+# Config directory
+CONFIG_DIR="/etc/linux-network-fixer"
+
+# Read DNS list from config
 dns_list=()
 while IFS= read -r line; do
   [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
   dns_list+=("$line")
-done < "dns_list.dns"
+done < "$CONFIG_DIR/dns_list.dns"
 
-# Read mirror list from .mirror file
+# Read mirror list from config
 mirrors=()
 while IFS= read -r line; do
   [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
   mirrors+=("$line")
-done < "ubuntu_sources.mirror"
+done < "$CONFIG_DIR/ubuntu_sources.mirror"
+
+# Read test domains from config
+test_domains=()
+while IFS= read -r line; do
+  [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
+  test_domains+=("$line")
+done < "$CONFIG_DIR/test_domains.list"
 
 # Detect OS
 get_os() {
@@ -41,19 +51,14 @@ get_os() {
   fi
 }
 
-# Show current mirror and DNS
-show_status() {
-  echo -e "${BLUE}Current DNS:${NC}"
-  grep nameserver /etc/resolv.conf | awk '{print "  - "$2}'
-
-  echo -e "\n${BLUE}Current Mirror:${NC}"
+# Get current DNS and mirror for display
+get_status_inline() {
+  current_dns=$(grep -m1 nameserver /etc/resolv.conf | awk '{print $2}')
   if [[ "$os" == "ubuntu" || "$os" == "debian" ]]; then
-    grep -m1 -o 'http[s]\?://[^ ]*' /etc/apt/sources.list 2>/dev/null
+    current_mirror=$(grep -m1 -o 'http[s]\?://[^ ]*' /etc/apt/sources.list 2>/dev/null)
   else
-    echo "Not applicable."
+    current_mirror="N/A"
   fi
-  echo
-  read -p "Press Enter to continue..."
 }
 
 # Set best DNS
@@ -61,18 +66,6 @@ set_best_dns() {
   echo -e "${CYAN}Testing DNS Servers for domain resolution...${NC}"
   echo "--------------------------------------------------------"
   cp /etc/resolv.conf /etc/resolv.conf.bak
-
-  case "$os" in
-    almalinux|centos|rhel)
-      test_domains=("repo.cpanel.net" "yum.almalinux.org" "archive.mariadb.org" "securedownloads.cpanel.net")
-      ;;
-    ubuntu|debian)
-      test_domains=("archive.ubuntu.com" "security.ubuntu.com")
-      ;;
-    *)
-      test_domains=("google.com" "cloudflare.com")
-      ;;
-  esac
 
   for dns in "${dns_list[@]}"; do
     echo -e "\nTesting ${CYAN}$dns${NC}..."
@@ -108,7 +101,7 @@ set_fastest_mirror() {
   best_mirror=""
   best_speed=0
   for mirror in "${mirrors[@]}"; do
-    speed=$(wget --timeout=5 --tries=1 -O /dev/null $mirror 2>&1 | grep -o '[0-9.]* [KM]B/s' | tail -1)
+    speed=$(wget --timeout=5 --tries=1 -O /dev/null "$mirror" 2>&1 | grep -o '[0-9.]* [KM]B/s' | tail -1)
     if [[ -z $speed ]]; then
       echo -e "${CYAN}$mirror${WHITE} | ${RED}Failed${NC}"
       continue
@@ -144,21 +137,23 @@ set_fastest_mirror() {
 # Main menu loop
 while true; do
   os=$(get_os)
+  get_status_inline
   clear
-  echo -e "${BLUE}╔═════════════════════════════════════════════╗"
-  echo -e "║               Linux Network Fixer                  ║"
+  echo -e "${BLUE}╔════════════════════════════════════════════════════╗"
+  echo -e "║               Linux Network Optimizer              ║"
   echo -e "╠════════════════════════════════════════════════════╣"
-  echo -e "║ ${CYAN}[1]${WHITE} 🔁 Check & Set Fastest Mirror   ║"
-  echo -e "║ ${CYAN}[2]${WHITE} 🌐 Check & Set Best DNS         ║"
-  echo -e "║ ${CYAN}[3]${WHITE} 📊 Show Current DNS & Mirror    ║"
-  echo -e "║ ${CYAN}[0]${RED} ❌ Exit                   ${WHITE}║"
+  echo -e "║ 🌐 DNS:    ${CYAN}$current_dns${NC}"
+  echo -e "║ 🔗 Mirror: ${CYAN}$current_mirror${NC}"
+  echo -e "╠════════════════════════════════════════════════════╣"
+  echo -e "║ ${CYAN}[1]${WHITE} 🔁 Check & Set Fastest Mirror (Ubuntu/Debian)   ║"
+  echo -e "║ ${CYAN}[2]${WHITE} 🌐 Check & Set Best DNS (All Distros)           ║"
+  echo -e "║ ${CYAN}[0]${RED} ❌ Exit                                         ${WHITE}║"
   echo -e "╚════════════════════════════════════════════════════╝"
   echo
   read -p "Select an option: " choice
   case $choice in
     1) set_fastest_mirror ;;
     2) set_best_dns ;;
-    3) show_status ;;
     0) exit 0 ;;
     *) echo -e "${RED}Invalid option!${NC}"; sleep 1 ;;
   esac

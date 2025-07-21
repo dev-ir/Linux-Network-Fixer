@@ -15,7 +15,7 @@ A simple Bash tool to fix network issues on Linux by:
 ## 📦 Installation
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/dev-ir/Linux-Network-Fixer/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/dev-ir/Linux-Network-Fixer/refs/heads/master/install.sh | bash
 ````
 ## 🚀 Usage
 
