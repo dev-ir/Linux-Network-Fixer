@@ -28,8 +28,18 @@ sudo git clone --depth=1 https://github.com/dev-ir/Linux-Network-Fixer.git "$INS
 # Install binary
 sudo install -m 755 "$INSTALL_DIR/main.sh" "$BIN_PATH"
 
-# Copy config
-sudo mkdir -p "$CONFIG_DIR"
-sudo cp -r "$INSTALL_DIR/configs/"* "$CONFIG_DIR/"
+# Copy config files from cloned repo
+if [ -d "$INSTALL_DIR" ]; then
+  sudo mkdir -p "$CONFIG_DIR"
+  sudo cp -r "$INSTALL_DIR/"* "$CONFIG_DIR/"
+else
+  echo -e "\033[1;31m❌ Config directory not found in cloned repo!\033[0m"
+  exit 1
+fi
+
+# Add restore-defaults option to binary if not present
+if ! grep -q restore_defaults "$INSTALL_DIR/main.sh"; then
+  echo -e "\033[1;33m⚠️  Note: 'Restore Defaults' option not detected in main.sh. Consider updating.\033[0m"
+fi
 
 echo -e "\033[1;32m✅ Installation complete. Run using: linux-net\033[0m"
