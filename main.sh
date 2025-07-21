@@ -56,6 +56,8 @@ get_status_inline() {
   current_dns=$(grep -m1 nameserver /etc/resolv.conf | awk '{print $2}')
   if [[ "$os" == "ubuntu" || "$os" == "debian" ]]; then
     current_mirror=$(grep -m1 -o 'http[s]\?://[^ ]*' /etc/apt/sources.list 2>/dev/null)
+  elif [[ "$os" == "almalinux" || "$os" == "centos" || "$os" == "rhel" ]]; then
+    current_mirror=$(grep -m1 -o 'http[s]\?://[^ ]*' /etc/yum.repos.d/*.repo 2>/dev/null)
   else
     current_mirror="N/A"
   fi
@@ -89,10 +91,10 @@ set_best_dns() {
   mv /etc/resolv.conf.bak /etc/resolv.conf
 }
 
-# Set fastest mirror for Ubuntu/Debian
+# Set fastest mirror for supported OS
 set_fastest_mirror() {
-  if [[ "$os" != "ubuntu" && "$os" != "debian" ]]; then
-    echo -e "${RED}Mirror selection only supported on Ubuntu/Debian.${NC}"
+  if [[ "$os" != "ubuntu" && "$os" != "debian" && "$os" != "almalinux" && "$os" != "centos" && "$os" != "rhel" ]]; then
+    echo -e "${RED}Mirror selection not supported for this OS.${NC}"
     read -p "Press Enter to return..."
     return
   fi
@@ -121,13 +123,18 @@ set_fastest_mirror() {
 
   if [[ -n $best_mirror ]]; then
     echo -e "\n${GREEN}Using fastest mirror: $best_mirror${NC}"
-    version=$(lsb_release -sr | cut -d '.' -f 1)
-    if [[ "$version" -ge 24 ]]; then
-      sudo sed -i "s|http[s]\?://[^ ]*|$best_mirror|g" /etc/apt/sources.list.d/ubuntu.sources
+    if [[ "$os" == "ubuntu" || "$os" == "debian" ]]; then
+      version=$(lsb_release -sr | cut -d '.' -f 1)
+      if [[ "$version" -ge 24 ]]; then
+        sudo sed -i "s|http[s]\?://[^ ]*|$best_mirror|g" /etc/apt/sources.list.d/ubuntu.sources
+      else
+        sudo sed -i "s|http[s]\?://[^ ]*|$best_mirror|g" /etc/apt/sources.list
+      fi
+      sudo apt-get update
     else
-      sudo sed -i "s|http[s]\?://[^ ]*|$best_mirror|g" /etc/apt/sources.list
+      sudo sed -i "s|http[s]\?://[^ ]*|$best_mirror|g" /etc/yum.repos.d/*.repo
+      sudo dnf makecache
     fi
-    sudo apt-get update
   else
     echo -e "${RED}No suitable mirror found.${NC}"
   fi
@@ -145,10 +152,10 @@ while true; do
   echo -e "║ 🌐 DNS:    ${CYAN}$current_dns${NC}"
   echo -e "║ 🔗 Mirror: ${CYAN}$current_mirror${NC}"
   echo -e "╠════════════════════════════════════════════════════╣"
-  echo -e "║ ${CYAN}[1]${WHITE} 🔁 Check & Set Fastest Mirror (Ubuntu/Debian)   ║"
-  echo -e "║ ${CYAN}[2]${WHITE} 🌐 Check & Set Best DNS (All Distros)           ║"
-  echo -e "║ ${CYAN}[3]${RED} 🔥 Uninstall Linux Network Fixer               ${WHITE}║
-║ ${CYAN}[0]${RED} ❌ Exit                                         ${WHITE}║"
+  echo -e "║ ${CYAN}[1]${WHITE} 🔁 Check & Set Fastest Mirror                  ║"
+  echo -e "║ ${CYAN}[2]${WHITE} 🌐 Check & Set Best DNS                       ║"
+  echo -e "║ ${CYAN}[3]${RED} 🔥 Uninstall Linux Network Fixer               ${WHITE}║"
+  echo -e "║ ${CYAN}[0]${RED} ❌ Exit                                         ${WHITE}║"
   echo -e "╚════════════════════════════════════════════════════╝"
   echo
   read -p "Select an option: " choice
