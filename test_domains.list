@@ -1,0 +1,8 @@
+# General domains to test DNS resolution
+repo.cpanel.net
+yum.almalinux.org
+archive.mariadb.org
+securedownloads.cpanel.net
+archive.ubuntu.com
+security.ubuntu.com
+google.com
