@@ -147,11 +147,19 @@ while true; do
   echo -e "╠════════════════════════════════════════════════════╣"
   echo -e "║ ${CYAN}[1]${WHITE} 🔁 Check & Set Fastest Mirror (Ubuntu/Debian)   ║"
   echo -e "║ ${CYAN}[2]${WHITE} 🌐 Check & Set Best DNS (All Distros)           ║"
-  echo -e "║ ${CYAN}[0]${RED} ❌ Exit                                         ${WHITE}║"
+  echo -e "║ ${CYAN}[3]${RED} 🔥 Uninstall Linux Network Fixer               ${WHITE}║
+║ ${CYAN}[0]${RED} ❌ Exit                                         ${WHITE}║"
   echo -e "╚════════════════════════════════════════════════════╝"
   echo
   read -p "Select an option: " choice
   case $choice in
+    3)
+      echo -e "${RED}Uninstalling...${NC}"
+      sudo rm -f /usr/local/bin/linux-net
+      sudo rm -rf /etc/linux-network-fixer
+      echo -e "${GREEN}✅ Uninstalled successfully.${NC}"
+      read -p "Press Enter to exit..."
+      exit 0 ;;
     1) set_fastest_mirror ;;
     2) set_best_dns ;;
     0) exit 0 ;;
